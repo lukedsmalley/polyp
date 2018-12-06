@@ -62,3 +62,5 @@ typings/
 
 # Configuration
 config.json
+id_rsa
+id_rsa.pub

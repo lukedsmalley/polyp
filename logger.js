@@ -18,11 +18,7 @@ function writeAll(entry) {
 }
 
 function writeTTY(entry) {
-  console.log(`${chalk.blue(entry.scope)} ${levels[entry.level](entry.level)} ${entry.message}`)
-}
-
-function writeDebug(scope, message) {
-  writeTTY({level: 'debug', scope, message})
+  console.log(`${chalk.blue('polyp')} ${levels[entry.level](entry.level)} ${entry.message}`)
 }
 
 function writeFile(entry) {
@@ -32,7 +28,7 @@ function writeFile(entry) {
 async function publishFile() {
   stream = fs.createWriteStream(`./logs/${inception}.log`, {flags: 'a'})
   stream.once('close', publishFile)
-  stream.on('error', err => writeDebug('logger', `Log file writer failed due to ${err}`))
+  stream.on('error', err => debug(`Log file writer failed due to ${err}`))
 }
 
 function unpublishFile() {
@@ -45,51 +41,46 @@ function unpublishFile() {
   })
 }
 
-class Logger {
-  constructor(scope) {
-    this.scope = scope
-  }
-
-  log(level, message) {
-    let time = (new Date).getTime()
-    let entry = {level, time, scope: this.scope, message}
-    writeAll(entry)
-  }
-
-  info(message) { this.log('info', message) }
-  warning(message) { this.log('warning', message) }
-  severe(message) { this.log('severe', message) }
-
-  debug(message) {
-    writeDebug(this.scope, message)
-  }
+function log(level, message) {
+  let time = (new Date).getTime()
+  let entry = {level, time, message}
+  writeAll(entry)
 }
 
-Logger.start = async function() {
+let info = message => log('info', message)
+let warning = message => log('warning', message)
+let severe = message => log('severe', message)
+
+let debug = message => writeTTY({level: 'debug', message})
+
+async function start() {
   try {
     await fs.mkdirs('./logs')
     //let logs = await fs.readdir('./logs')
     //if (logs.length > 31) {
-      //await fs.remove() //TODO: FINISH THIS CLEANUP ROUTINE
+    //  await fs.remove() //TODO: FINISH THIS CLEANUP ROUTINE
     //}
   } catch (err) {
-    writeDebug('logger', `Failed to prepare log directory due to ${err}`)
+    debug(`Failed to prepare log directory due to ${err}`)
+    return
   }
 
   try {
     await publishFile()
     adapters.push(writeFile)
   } catch (err) {
-    writeDebug('logger', `Failed to publish log file due to ${err}`)
+    debug(`Failed to publish log file due to ${err}`)
   }
 }
 
-Logger.stop = async function() {
+async function stop() {
   try {
     await unpublishFile()
   } catch (err) {
-    writeDebug('logger', `Failed to flush log file due to ${err}`)
+    debug('logger', `Failed to flush log file due to ${err}`)
   }
 }
 
-module.exports = Logger
+module.exports = {
+  start, stop, info, warning, severe, debug
+}
