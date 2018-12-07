@@ -6,6 +6,7 @@ const helmet = require('helmet')
 const jwt = require('jsonwebtoken')
 const uuid = require('uuid/v1')
 const logger = require('./logger')
+const {notNull, nonNullProperty} = require('./utilities')
 
 const app = express()
 const privateKey, publicKey
@@ -22,11 +23,7 @@ const configuration = {
 }
 const tokens = []
 
-function getSHA(input) {
-  let hash = crypto.createHash('sha256')
-  hash.update(input + configuration.salt)
-  return hash.digest('base64')
-}
+
 
 function checkPrivilege(scope) {
   return function(request, response, next) {
@@ -54,6 +51,15 @@ app.use(helmet())
 app.use(express.json())
 
 app.post('/v1/authorize', function(request, response) {
+  try {
+    let secret = nonNullProperty(request.body, 'secret', 'string')
+    let clientId = nonNullProperty(request.body, 'clientId', 'string')
+    tokens.issue(secret, clientId, response.send)
+  } catch (err) {
+    response.sendStatus(403)
+    logger.severe(`403 -> ${request.ip}: ${err}`)
+  }
+
   let secret
   if (!request.body.secret || !request.body.clientId) {
     response.sendStatus(403)
