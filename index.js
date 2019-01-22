@@ -1,12 +1,9 @@
 
-const crypto = require('crypto')
 const express = require('express')
-const fs = require('fs-extra')
 const helmet = require('helmet')
 const jwt = require('jsonwebtoken')
-const uuid = require('uuid/v1')
 const logger = require('./logger')
-const {notNull, nonNullProperty} = require('./utilities')
+const {nonNullProperty} = require('./utilities')
 
 const app = express()
 const privateKey, publicKey
@@ -22,8 +19,6 @@ const configuration = {
   profiles: {}
 }
 const tokens = []
-
-
 
 function checkPrivilege(scope) {
   return function(request, response, next) {
@@ -54,27 +49,12 @@ app.post('/v1/authorize', function(request, response) {
   try {
     let secret = nonNullProperty(request.body, 'secret', 'string')
     let clientId = nonNullProperty(request.body, 'clientId', 'string')
-    tokens.issue(secret, clientId, response.send)
+    let token = tokens.issue(secret, clientId)
+    response.send(jwt.sign(token, configuration.privateKey, {algorithm: 'RS256'}))
+    logger.info(`200 -> ${request.ip}: Issued token for subject '${payload.sub}'`)
   } catch (err) {
     response.sendStatus(403)
     logger.severe(`403 -> ${request.ip}: ${err}`)
-  }
-
-  let secret
-  if (!request.body.secret || !request.body.clientId) {
-    response.sendStatus(403)
-    logger.severe(`403 -> ${request.ip}: No secret and/or clientId`)
-  } else if (!configuration.profiles.hasOwnProperty(secret = getSHA(request.body.secret))) {
-    response.sendStatus(403)
-    logger.severe(`403 -> ${request.ip}: Unknown secret`)
-  } else {
-    let time = Date.now()
-    let jti = uuid()
-    let payload = Object.assign({jti, cid: request.body.clientid}, configuration.common, configuration.profiles[secret])
-    for (let stamp of ['exp', 'iat', 'nbf']) if (payload[stamp]) payload[stamp] += time
-    response.send(jwt.sign(payload, configuration.privateKey, {algorithm: 'RS256'}))
-    tokens.push(payload)
-    logger.info(`200 -> ${request.ip}: Issued token for subject ${payload.sub}`)
   }
 })
 
